@@ -103,6 +103,7 @@ class VM:
                 setattr(self, attr, None)    
 
 
+
 logging.basicConfig(level=logging.INFO)
 
 
@@ -207,6 +208,7 @@ class DataProcessor:
 
         # Save the VM object
         vm_netbox.save()
+
     def _set_vm_tags(self, vm_netbox, tags):
         existing_tags = {tag.name for tag in vm_netbox.tags}
         for tag_name in tags:
@@ -397,9 +399,21 @@ class DataProcessor:
         else:
             logging.warning(f"No NetBox site ID found for vCenter site: {vcenter_site_name}")
             return None
-        
 
-  def get_or_create_interface(self, vm, create_if_not_exists=True):
+
+
+    def get_interfaces_by_vm_id(self, vm_id):
+        try:
+            interfaces = self.netbox.virtualization.interfaces.filter(virtual_machine_id=vm_id)
+            # Fetch each interface individually to include ip_addresses
+            interfaces = [self.netbox.virtualization.interfaces.get(id=interface.id) for interface in interfaces]
+            return interfaces
+        except pynetbox.RequestError as e:
+            logging.error(f"Failed to fetch interfaces for VM ID {vm_id}: {e}")
+            return []
+
+
+    def get_or_create_interface(self, vm, create_if_not_exists=True):
         interface_name = 'ens192'
         vm_id = vm.id if isinstance(vm.id, int) else int(vm.id)
         interface = self.netbox.virtualization.interfaces.get(virtual_machine_id=vm_id, name=interface_name)
@@ -594,7 +608,11 @@ class DataProcessor:
             return datetime.now() - last_modified > timedelta(days=1)
         else:
             return True  # or handle accordingly
+
+
+
     def process_vms(self):
+        
         if self.should_update_vms():
             self.vcenter_connector.connect()
             vms = self.vcenter_connector.get_vm_info()
@@ -611,10 +629,11 @@ class DataProcessor:
             vm_mapping.setdefault(key, []).append(vm)
 
         for vcenter_vm in vms:
+            # Skip VMs with no cluster or site mapping
             vcenter_cluster_name = vcenter_vm.cluster
             cluster_map = self.cluster_mapping.get(vcenter_cluster_name, self.cluster_mapping.get("Unknown", {}))
             target_cluster_id = cluster_map.get("netbox_cluster_id")
-            target_site_id = cluster_map.get("netbox_site_id")
+            target_site_id = cluster_map.get("netbox_site_id")  
 
             # Validate cluster and site IDs
             if not self.netbox.virtualization.clusters.get(target_cluster_id):
@@ -649,14 +668,8 @@ class DataProcessor:
                     logging.info(f"VM {vcenter_vm.name} created in NetBox.")
 
 
-
-
-
     def tag_and_fail_old_vm(self, old_vm):
-        self.  
-
         self.add_tag_to_vm(old_vm, self.ORPHANED_TAG)
         old_vm.status = 'failed'
         old_vm.save()
         logging.info(f"VM {old_vm.name} tagged as 'ORPHANED_FROM_SYNC' and set to 'failed'.")
-        

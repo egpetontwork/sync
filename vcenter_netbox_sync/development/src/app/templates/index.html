@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Synchronization Status</title>
+</head>
+<body>
+    <h1>Synchronization Status</h1>
+    <p>Last Run: {{ status['last_run'] }}</p>
+    <p>Status: {{ status['status'] }}</p>
+    {% if status['is_running'] %}
+        <p>Synchronization is currently running.</p>
+    {% else %}
+        <form action="/trigger_sync" method="post">
+            {{ form.hidden_tag() }}
+            {{ form.submit() }}
+        </form>
+    {% endif %}
+    <h2>Log</h2>
+    <pre>{{ log }}</pre>
+    {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</body>
+</html>
