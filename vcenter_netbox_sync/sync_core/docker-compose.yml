@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  prefect:
+    image: prefecthq/prefect:2.10.15-python3.11
+    environment:
+      PREFECT_API_URL: "http://prefect-api:4200/api"
+    ports:
+      - "4200:4200"
+    depends_on:
+      - redis
+
+  core_sync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      VSPHERE_HOST: ${VSPHERE_HOST}
+      VSPHERE_USERNAME: ${VSPHERE_USERNAME}
+      VSPHERE_PASSWORD: ${VSPHERE_PASSWORD}
+      PREFECT_API_URL: "http://prefect:4200/api"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - redis
+      - prefect
+    command: ["python", "-m", "core_sync"]
